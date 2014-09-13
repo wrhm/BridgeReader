@@ -41,8 +41,38 @@ AB Comedy ::: A permanent committee whose purpose is to provide the campus commu
 '''
 
 from club_scraper import *
+import string
 
 '''harvest_all_clubs()'''
+
+'''Clean up dictionary'''
+print 'Cleaning dictionary...'
+print 'Reading in lines...'
+f = open('cleaned_dict.txt','r')
+lines = []
+for x in f.readlines():
+	line = ''
+	for i in xrange(len(x)):
+		if ord(line[i])<128: #Remove non-ASCII-compatible characters
+			line += line[i]
+	lines.append(line)
+f.close()
+
+'''
+print 'Writing out lines...'
+f = open('cleaned_dict.txt','w')
+for e in lines:
+	if len(e)>2:
+		f.write(e)
+f.close()
+print 'Dictionary cleaned.'
+'''
+
+'''End cleanup'''
+
+#Print all entries found in the dictionary
+
+
 
 clubs = []
 f = open('club_descriptions.txt')
@@ -51,15 +81,23 @@ for line in f.readlines():
 	clubs.append(pair)
 f.close()
 
+#all_words = ' '.join([x[0]+' '+x[1] for x in clubs])
+#print all_words
+
 #print clubs
 
 #Returns a set of the terms related to the passed term.
 #Either synonyms or uncommon definition constituents.
 def related_terms(term):
-	pass
+	result = [term]
+	for e in term.split(' '):
+		if e not in result:
+			result.append(e)
+	return result
 
 #Finds clubs in the club_descriptions.txt file whose definitions contain term
 #Returns a set of the names of the relevant clubs.
+#NO LONGER NEEDED; SAME FUNCTION SERVED BY SUBROUTINE IN matched_clubs
 def relevant_clubs(term):
 	result = []
 	for e in clubs:
@@ -67,8 +105,21 @@ def relevant_clubs(term):
 			result.append(e)
 	return result
 
-query = 'math'
-print 'Clubs related to \"%s\":'%query
-rel = relevant_clubs(query)
-for c in rel:
-	print c
+#The 'MAGIC' method; returns all clubs pertinent to the query or
+#its related terms.
+def matched_clubs(query):
+	query = string.lower(query)
+	q_rel = related_terms(query)
+	print 'Terms related to \"%s\": %s.'%(query,q_rel)
+	print '\nClubs containing these terms:'
+	relevant = []
+	for related in q_rel:
+		for e in clubs:
+			if related in string.lower(e[0]) or related in string.lower(e[1]):
+				relevant.append(e)
+		#relevant.append(relevant_clubs(related))
+	for c in relevant:
+		print c
+	return relevant
+
+#matched_clubs('fun trips')
