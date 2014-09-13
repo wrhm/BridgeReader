@@ -46,6 +46,7 @@ import string
 '''harvest_all_clubs()'''
 
 '''Clean up dictionary'''
+'''
 print 'Cleaning dictionary...'
 print 'Reading in lines...'
 f = open('cleaned_dict.txt','r')
@@ -57,6 +58,7 @@ for x in f.readlines():
 			line += line[i]
 	lines.append(line)
 f.close()
+'''
 
 '''
 print 'Writing out lines...'
