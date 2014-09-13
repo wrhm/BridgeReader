@@ -42,60 +42,126 @@ AB Comedy ::: A permanent committee whose purpose is to provide the campus commu
 
 from club_scraper import *
 import string
+import ast, re
 
-'''harvest_all_clubs()'''
+alpha = string.ascii_lowercase+string.ascii_uppercase
 
-'''Clean up dictionary'''
 '''
-print 'Cleaning dictionary...'
-print 'Reading in lines...'
-f = open('cleaned_dict.txt','r')
-lines = []
-for x in f.readlines():
-	line = ''
-	for i in xrange(len(x)):
-		if ord(line[i])<128: #Remove non-ASCII-compatible characters
-			line += line[i]
-	lines.append(line)
+#This code was used to clean the json file into a line-by-line pairwise file. (Triple-colon delimited)
+print 'Reading dict...'
+f = open('json_dictionary.txt','r')
+line = (f.readlines()[0])[:-1]
 f.close()
-'''
 
-'''
-print 'Writing out lines...'
-f = open('cleaned_dict.txt','w')
-for e in lines:
-	if len(e)>2:
-		f.write(e)
+d = ast.literal_eval(line)
+
+f = open('cleaner_dict.txt','w')
+print 'Dict read!'
+for e in d:
+	d[e] = string.lower(' '.join((' '.join(re.split(',|;|\.',d[e]))).split())
+	d[e] = ''.join([x for x in d[e] if x in (alpha+' ')])
+	#print e,d[e]
+	f.write('%s ::: %s\n'%(e,d[e]))
 f.close()
-print 'Dictionary cleaned.'
+print 'All json dict entries cleaned and written to new file.'
 '''
 
-'''End cleanup'''
+'''
+#No longer needed; use dict parser now on punct_cleaned_j_dict
+#omit extra spaces
+print 'Removing extra spaces from json file...'
+s = ''
+i = 0
+while i < (len(line)-1):
+	s += line[i]
+	if line[i] in ';,.' and line[i+1]==' ':
+		i += 1
+	i += 1
+f = open('punct_cleaned_j_dict.txt','w')
+f.write(s)
+f.close()
+print 'Extra spaces removed!'
+'''
 
-#Print all entries found in the dictionary
-
-
-
+print 'Loading clubs...'
 clubs = []
 f = open('club_descriptions.txt')
 for line in f.readlines():
 	pair = (line[:-1]).split(' ::: ')
 	clubs.append(pair)
 f.close()
+print 'Clubs loaded!'
 
-#all_words = ' '.join([x[0]+' '+x[1] for x in clubs])
+print 'Loading definitions...'
+definitions = dict()
+f = open('cleaner_dict.txt')
+for line in f.readlines():
+	pair = (line[:-1]).split(' ::: ')
+	definitions[pair[0]] = string.lower(pair[1])
+f.close()
+print 'Definitions loaded!'
+#print definitions['LINGUISTICS']
+
+#list of all words found in club titles/descriptions
+all_words_from_clubs = (' '.join([string.lower(x[0]+' '+x[1]) for x in clubs])).split()
+num_words_from_clubs = len(all_words_from_clubs)
 #print all_words
 
+all_words_from_defs = (' '.join([string.lower(e+' '+definitions[e]) for e in definitions])).split()
+num_words_from_defs = len(all_words_from_defs)
 #print clubs
+
+#Returns the fractional prevalence of a word in the corpus all_words_from_clubs
+def prevalence(word):
+	word = string.lower(word)
+	return (10.0**5.0)*float(all_words_from_clubs.count(word))/float(num_words_from_clubs)
 
 #Returns a set of the terms related to the passed term.
 #Either synonyms or uncommon definition constituents.
-def related_terms(term):
-	result = [term]
-	for e in term.split(' '):
-		if e not in result:
+def related_terms(term, min_prev, max_prev):
+	result = [string.lower(x) for x in term.split(' ')]
+	others,uncommons = [],[]
+	origs = result
+	for item in origs:
+		if string.upper(item) in definitions:
+			others = (definitions[string.upper(item)]).split(' ')
+			for e in others:
+				if prevalence(e)>=min_prev and prevalence(e)<=max_prev:
+					uncommons.append(e)
+	uncommons = result + uncommons
+	result = []
+	for e in uncommons:
+		if not e in result:
+			result.append(e)
+	'''for x in result:
+		if string.upper(x) in definitions and prevalence(x)<max_prev:
+			for e in (definitions[string.upper(x)]).split(' '):
+				if not e in uncommons:
+					uncommons += e'''
+	return result#+uncommons
+
+'''
+#outdated
+def related_terms(term, max_prev):
+	result = [term]+term.split()
+	others, uncommons = [], []
+	if string.upper(term) in definitions:
+		others = (' '.join([definitions[string.upper(x)] for x in result if string.upper(x) in definitions])).split()
+		others += uncommons
+		uncommons = [x for x in others if prevalence(x)<max_prev and x not in uncommons]
+		singles = []
+		for x in uncommons:
+			if not x in singles:
+				singles.append(x)
+		uncommons = singles
+		print '%s has a definition: %s'%(term,uncommons)#others)
+	for e in term.split() + uncommons:
+		if e not in result and prevalence(e)<max_prev:
 			result.append(e)
 	return result
+'''
+
+#print related_terms('linguistics')
 
 #Finds clubs in the club_descriptions.txt file whose definitions contain term
 #Returns a set of the names of the relevant clubs.
@@ -110,18 +176,20 @@ def relevant_clubs(term):
 #The 'MAGIC' method; returns all clubs pertinent to the query or
 #its related terms.
 def matched_clubs(query):
-	query = string.lower(query)
-	q_rel = related_terms(query)
-	print 'Terms related to \"%s\": %s.'%(query,q_rel)
-	print '\nClubs containing these terms:'
+	min_prev, max_prev = 0.0,65.0
+	query = string.upper(query)
+	q_rel = related_terms(query, min_prev, max_prev)
+	q_rel = [x for x in q_rel if prevalence(x)>=min_prev and prevalence(x)<=max_prev]
+	print 'Terms related to \"%s\" between min_prev %.1f and max_prev %.1f: %s.'%(query,min_prev,max_prev,[[x,prevalence(x)] for x in q_rel if prevalence(x)>=min_prev and prevalence(x)<=max_prev])#q_rel)
 	relevant = []
 	for related in q_rel:
 		for e in clubs:
-			if related in string.lower(e[0]) or related in string.lower(e[1]):
+			if string.upper(related) in string.upper(e[0]) or string.upper(related) in string.upper(e[1]):
 				relevant.append(e)
 		#relevant.append(relevant_clubs(related))
+	print '\nClubs containing these terms (%d):'%len(relevant)
 	for c in relevant:
 		print c
-	return relevant
+	return
 
-#matched_clubs('fun trips')
+matched_clubs('outdoor sports')
