@@ -1,0 +1,34 @@
+.jumboHead {
+    padding: 5px;
+    margin-bottom: 10px;
+    color: white;
+    background-color: black;
+}
+.jumboHead h1,
+.jumboHead .h1 {
+    color: inherit;
+}
+.jumboHead p {
+    font-size: 20px;
+    font-weight: 200;
+    color: black;
+    font-family: sans-serif;
+}
+.container .jumboHead {
+    border-radius: 6px;
+}
+.jumboHead .container {
+    max-width: 100%;
+}
+
+a.jumboHeadLinks:link,a.jumboHeadLinks:visited {color:white;}
+
+loginbody{
+    background: url(http://mymaplist.com/img/parallax/back.png);
+	background-color: #444;
+    background: url(http://mymaplist.com/img/parallax/pinlayer2.png),url(http://mymaplist.com/img/parallax/pinlayer1.png),url(http://mymaplist.com/img/parallax/back.png);    
+}
+
+.loginVertical-offset-100{
+    padding-top:100px;
+}
