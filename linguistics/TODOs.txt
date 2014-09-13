@@ -1,0 +1,4 @@
+TODOs
+
+ - Fix Deep Scrape
+ - Extend synonym branching from above and below

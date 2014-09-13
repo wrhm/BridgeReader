@@ -38,6 +38,13 @@ Example:
 
 AB Comedy ::: A permanent committee whose purpose is to provide the campus community with comedy shows during the school year.
 
+
+
+TODOs
+
+ - Fix Deep Scrape
+ - Extend synonym branching from above and below
+
 '''
 
 from club_scraper import *
@@ -45,6 +52,8 @@ import string
 import ast, re
 
 alpha = string.ascii_lowercase+string.ascii_uppercase
+
+#harvest_all_clubs()
 
 '''
 #This code was used to clean the json file into a line-by-line pairwise file. (Triple-colon delimited)
@@ -99,7 +108,7 @@ for line in f.readlines():
 	pair = (line[:-1]).split(' ::: ')
 	definitions[pair[0]] = string.lower(pair[1])
 f.close()
-print 'Definitions loaded!'
+print 'Definitions loaded!\n\n'
 #print definitions['LINGUISTICS']
 
 #list of all words found in club titles/descriptions
@@ -112,9 +121,38 @@ num_words_from_defs = len(all_words_from_defs)
 #print clubs
 
 #Returns the fractional prevalence of a word in the corpus all_words_from_clubs
-def prevalence(word):
+def prevalence(word,corpus):
 	word = string.lower(word)
-	return (10.0**5.0)*float(all_words_from_clubs.count(word))/float(num_words_from_clubs)
+	return (10.0**5.0)*float(corpus.count(word))/float(len(corpus))
+
+#term is a list
+def def_per_word(term):
+	term = [string.upper(x) for x in term]
+	t = []
+	for e in term:
+		if e in definitions:
+			for w in definitions[e].split():
+				if w not in t:
+					t.append(w)
+	return t
+
+#term is a string, n an int
+def depth_n_definer(term,n):
+	w = term.split()
+	for i in xrange(n):
+		w = w+def_per_word(w)
+	return w
+
+#Scores the similariy of the multiplicities of the elements of lists s and t
+#Low score means high similarity
+def sim_mult(s,t):
+	score = 0.0
+	for e in s:
+		score += (s.count(e)-t.count(e))**2
+	for e in t:
+		score += (t.count(e)-s.count(e))**2
+	return score
+
 
 #Returns a set of the terms related to the passed term.
 #Either synonyms or uncommon definition constituents.
@@ -126,42 +164,15 @@ def related_terms(term, min_prev, max_prev):
 		if string.upper(item) in definitions:
 			others = (definitions[string.upper(item)]).split(' ')
 			for e in others:
-				if prevalence(e)>=min_prev and prevalence(e)<=max_prev:
+				if prevalence(e,all_words_from_clubs)>=min_prev and prevalence(e,all_words_from_clubs)<=max_prev:
 					uncommons.append(e)
 	uncommons = result + uncommons
 	result = []
 	for e in uncommons:
 		if not e in result:
 			result.append(e)
-	'''for x in result:
-		if string.upper(x) in definitions and prevalence(x)<max_prev:
-			for e in (definitions[string.upper(x)]).split(' '):
-				if not e in uncommons:
-					uncommons += e'''
-	return result#+uncommons
+	return [string.lower(x) for x in term.split(' ')]+result#+uncommons
 
-'''
-#outdated
-def related_terms(term, max_prev):
-	result = [term]+term.split()
-	others, uncommons = [], []
-	if string.upper(term) in definitions:
-		others = (' '.join([definitions[string.upper(x)] for x in result if string.upper(x) in definitions])).split()
-		others += uncommons
-		uncommons = [x for x in others if prevalence(x)<max_prev and x not in uncommons]
-		singles = []
-		for x in uncommons:
-			if not x in singles:
-				singles.append(x)
-		uncommons = singles
-		print '%s has a definition: %s'%(term,uncommons)#others)
-	for e in term.split() + uncommons:
-		if e not in result and prevalence(e)<max_prev:
-			result.append(e)
-	return result
-'''
-
-#print related_terms('linguistics')
 
 #Finds clubs in the club_descriptions.txt file whose definitions contain term
 #Returns a set of the names of the relevant clubs.
@@ -176,20 +187,97 @@ def relevant_clubs(term):
 #The 'MAGIC' method; returns all clubs pertinent to the query or
 #its related terms.
 def matched_clubs(query):
-	min_prev, max_prev = 0.0,65.0
+	min_prev = 0.1
+	max_prev = 65.0
 	query = string.upper(query)
-	q_rel = related_terms(query, min_prev, max_prev)
-	q_rel = [x for x in q_rel if prevalence(x)>=min_prev and prevalence(x)<=max_prev]
-	print 'Terms related to \"%s\" between min_prev %.1f and max_prev %.1f: %s.'%(query,min_prev,max_prev,[[x,prevalence(x)] for x in q_rel if prevalence(x)>=min_prev and prevalence(x)<=max_prev])#q_rel)
+	q_rel,q_rel_init = [],related_terms(query, min_prev, max_prev)
+	for e in q_rel_init:
+		if not e in q_rel:
+				q_rel.append(e)
+	#q_rel = [x for x in q_rel if (prevalence(x,all_words_from_clubs)>=min_prev and prevalence(x,all_words_from_clubs)<=max_prev)]
+	''' for e in query.split(' '):
+		if e not in q_rel:
+			q_rel = [e]+q_rel '''
+	print 'Terms related to \"%s\" between min_prev %.1f and max_prev %.1f: %s.'%(query,min_prev,max_prev,[[x,prevalence(x,all_words_from_clubs)] for x in q_rel])# if prevalence(x,all_words_from_clubs)>=min_prev and prevalence(x,all_words_from_clubs)<=max_prev])
 	relevant = []
 	for related in q_rel:
 		for e in clubs:
 			if string.upper(related) in string.upper(e[0]) or string.upper(related) in string.upper(e[1]):
-				relevant.append(e)
+				if e not in relevant:
+					relevant.append(e)
 		#relevant.append(relevant_clubs(related))
 	print '\nClubs containing these terms (%d):'%len(relevant)
-	for c in relevant:
-		print c
-	return
+	#for c in relevant:
+		#print c
+	return relevant
 
-matched_clubs('outdoor sports')
+#The NEW 'MAGIC' method; returns all clubs pertinent to the query or
+#its related terms, ranked by relevance.
+def rank_matched_clubs(query,num_winners):
+	min_prev = 0.1
+	max_prev = 65.0
+	query = string.upper(query)
+	q_rel,q_rel_init = [],related_terms(query, min_prev, max_prev)
+	for e in q_rel_init:
+		if not e in q_rel:
+				q_rel.append(e)
+	#q_rel = [x for x in q_rel if (prevalence(x,all_words_from_clubs)>=min_prev and prevalence(x,all_words_from_clubs)<=max_prev)]
+	''' for e in query.split(' '):
+		if e not in q_rel:
+			q_rel = [e]+q_rel '''
+	print '(At most %d) Terms related to \"%s\" between min_prev %.1f and max_prev %.1f: %s.'%(num_winners,query,min_prev,max_prev,[[x,prevalence(x,all_words_from_clubs)] for x in q_rel])# if prevalence(x,all_words_from_clubs)>=min_prev and prevalence(x,all_words_from_clubs)<=max_prev])
+	relevant = {}
+	for related in q_rel:
+		for e in clubs:
+			ct = (string.upper(e[0]) + string.upper(e[1])).count(string.upper(related))
+			#if string.upper(related) in string.upper(e[0]) + string.upper(e[1]):
+			if ct > 0:
+				if clubs.index(e) not in relevant:
+					relevant[clubs.index(e)] = ct
+		#relevant.append(relevant_clubs(related))
+	#print '\nClubs containing these terms (%d):'%len(relevant)
+	#for c in relevant:
+		#print c
+	return [clubs[x] for x in sorted(relevant, key=relevant.get, reverse=True)[:num_winners]]
+
+#Identify best-matching club(s) by branching down from term and
+#up from each club, scoring highly for high overlap in vocabulary
+def two_way_tree_connector(term,depth,num):
+	matched = matched_clubs(term)
+	c_text = [' '.join(c[0].split()+c[1].split()) for c in matched]
+	for i in xrange(len(c_text)):
+		c_text[i] = depth_n_definer(c_text[i],depth)
+
+	dnt = depth_n_definer(term,depth)
+
+	#now, find club(s) with greatest c_text overlap with dnt
+	winners = []
+	scores = []
+	for i in xrange(len(c_text)):
+		scores.append(sim_mult(c_text[i],dnt))
+
+	for w in xrange(num):
+		winner = scores.index(min(scores))
+		#print max(scores)
+		scores[winner] = max(scores)+1
+		winners.append(clubs[winner])
+	return winners
+
+#for e in two_way_tree_connector("art",1,6):
+#	print e
+
+#for e in matched_clubs('art'):
+	#print e
+
+for e in rank_matched_clubs('music',3):
+	print '\t%s'%e
+print ''
+for e in rank_matched_clubs('kayaking',2):
+	print '\t%s'%e
+print ''
+for e in rank_matched_clubs('math',5):
+	print '\t%s'%e
+print ''
+#for e in rank_matched_clubs('leisure',5):
+	#print '\t%s'%e
+#print '\tSorry, no leisurely activities exist at CMU'
